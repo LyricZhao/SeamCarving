@@ -13,6 +13,8 @@ set(QT_VERSION 5)
 set(REQUIRED_LIBS Core Gui Widgets)
 set(REQUIRED_LIBS_QUALIFIED Qt5::Core Qt5::Gui Qt5::Widgets)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -openmp")
+
 add_executable(${PROJECT_NAME} main.cpp window.cpp scaling.cpp)
 
 if (NOT CMAKE_PREFIX_PATH)
