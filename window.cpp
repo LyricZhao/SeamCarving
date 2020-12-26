@@ -1,7 +1,7 @@
 #include "window.h"
 #include "scaling.h"
 
-Window::Window(const QImage &image, QWidget *parent): image(image), QLabel(parent) {
+Window::Window(const QImage &image, QWidget *parent): image(image.convertToFormat(QImage::Format_ARGB32)), QLabel(parent) {
     setMinimumSize(32, 32);
     setPixmap(QPixmap::fromImage(image));
 }

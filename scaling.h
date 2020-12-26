@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QPixmap>
+#include <QImage>
 #include <QSize>
 
 QImage scale(const QImage &image, const QSize &size);
