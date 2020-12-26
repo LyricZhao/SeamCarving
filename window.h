@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include <QImage>
 #include <QLabel>
 #include <QResizeEvent>
 #include <QWidget>
@@ -9,10 +10,10 @@
 class Window: public QLabel {
     Q_OBJECT
 private:
-    QPixmap image;
+    QImage image;
 
 public:
-    explicit Window(const QPixmap &image, QWidget* parent=nullptr);
+    explicit Window(const QImage &image, QWidget* parent=nullptr);
 
 public slots:
     void resizeEvent(QResizeEvent *event) override;

@@ -3,4 +3,4 @@
 #include <QPixmap>
 #include <QSize>
 
-QPixmap scale(const QPixmap &image, const QSize &size);
+QImage scale(const QImage &image, const QSize &size);

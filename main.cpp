@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 
     // Read image
     QApplication app(argc, argv);
-    QPixmap image;
+    QImage image;
     if (not image.load(argv[1])) {
         std::cerr << "Failed to load image " << argv[1] << std::endl;
         std::exit(EXIT_FAILURE);
