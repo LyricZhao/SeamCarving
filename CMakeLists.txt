@@ -13,7 +13,7 @@ set(QT_VERSION 5)
 set(REQUIRED_LIBS Core Gui Widgets)
 set(REQUIRED_LIBS_QUALIFIED Qt5::Core Qt5::Gui Qt5::Widgets)
 
-add_executable(${PROJECT_NAME} main.cpp window.cpp scaling.cpp)
+add_executable(seam_carving main.cpp window.cpp scaling.cpp)
 
 if (NOT CMAKE_PREFIX_PATH)
     message(WARNING "CMAKE_PREFIX_PATH is not defined, you may need to set it "
@@ -22,4 +22,4 @@ endif ()
 
 find_package(Qt${QT_VERSION} COMPONENTS ${REQUIRED_LIBS} REQUIRED)
 find_package(OpenMP REQUIRED)
-target_link_libraries(${PROJECT_NAME} ${REQUIRED_LIBS_QUALIFIED} OpenMP::OpenMP_CXX)
+target_link_libraries(seam_carving ${REQUIRED_LIBS_QUALIFIED} OpenMP::OpenMP_CXX)

@@ -16,7 +16,7 @@ private:
 
 public:
     explicit Window(const QImage &image, const char *output_path, QWidget* parent=nullptr);
-    ~Window();
+    ~Window() override;
 
 public slots:
     void resizeEvent(QResizeEvent *event) override;
