@@ -109,7 +109,7 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
     return seam;
 }
 
-QImage add_seam(const QImage &image, std::vector<int> &seam, Direction direction) {
+QImage add_seam(const QImage &image, const std::vector<int> &seam, Direction direction) {
     QSize size = direction == Horizontal ? QSize(image.width(), image.height() + 1):
                  QSize(image.width() + 1, image.height());
     QImage scaled(size, image.format());
@@ -147,7 +147,7 @@ QImage add_seam(const QImage &image, std::vector<int> &seam, Direction direction
     return scaled;
 }
 
-QImage delete_seam(const QImage &image, std::vector<int> &seam, Direction direction) {
+QImage delete_seam(const QImage &image, const std::vector<int> &seam, Direction direction) {
     QSize size = direction == Horizontal ? QSize(image.width(), image.height() - 1):
             QSize(image.width() - 1, image.height());
     QImage scaled(size, image.format());
@@ -170,41 +170,90 @@ QImage delete_seam(const QImage &image, std::vector<int> &seam, Direction direct
     return scaled;
 }
 
-void preprocess_seams(const QImage &image, int min_w, int min_h, int max_w, int max_h,
-                      std::vector<std::vector<int>> &h_seams, std::vector<std::vector<int>> &v_seams) {
-    h_seams.clear();
-    v_seams.clear();
-    // TODO: coding
+void convert_mark_seam(int w, int h, std::vector<int> &seam, bool *deleted, Direction direction) {
+    if (direction == Horizontal) {
+        assert(seam.size() == w);
+        for (int x = 0; x < w; ++ x) {
+            int index = x;
+            for (int y = 0, removal_y = 0; y < h; ++ y, index += w) {
+                if (not deleted[index]) {
+                    if (removal_y == seam[x]) {
+                        seam[x] = y + y - removal_y;
+                        deleted[index] = true;
+                        break;
+                    }
+                    ++ removal_y;
+                }
+            }
+        }
+    }
+
+    if (direction == Vertical) {
+        assert(seam.size() == h);
+        for (int y = 0; y < h; ++ y) {
+            int index = y * w;
+            for (int x = 0, removal_x = 0; x < w; ++ x, ++ index) {
+                if (not deleted[index]) {
+                    if (removal_x == seam[y]) {
+                        seam[y] = x + x - removal_x;
+                        deleted[index] = true;
+                        break;
+                    }
+                    ++ removal_x;
+                }
+            }
+        }
+    }
 }
 
-QImage scale(const QImage &image, const QSize &size,
-             const std::vector<std::vector<int>> &h_seams, const std::vector<std::vector<int>> &v_seams) {
-    // TODO: use h/v_seams
+QImage scale(const QImage &image, const QSize &size) {
     // Make workspace
     QImage scaled = image;
     int max_w = std::max(image.width(), size.width());
     int max_h = std::max(image.height(), size.height());
     auto *dp_space = static_cast<cost_t*>(std::malloc(max_w * max_h * sizeof(cost_t)));
     auto *mark_space = static_cast<mark_t*>(std::malloc(max_w * max_h * sizeof(mark_t)));
+    auto *deleted = static_cast<bool*>(std::malloc(max_w * max_h * sizeof(bool)));
 
     // Scale by height
-    while (scaled.height() != size.height()) {
-        auto seam = find_seam(scaled, Horizontal, dp_space, mark_space);
-        scaled = scaled.height() < size.height() ?
-                 add_seam(scaled, seam, Horizontal):
-                 delete_seam(scaled, seam, Horizontal);
+    if (scaled.height() > size.height()) {
+        for (int i = 0, length = scaled.height() - size.height(); i < length; ++ i) {
+            auto seam = find_seam(scaled, Horizontal, dp_space, mark_space);
+            scaled = delete_seam(scaled, seam, Horizontal);
+        }
+    } else if (scaled.height() < size.height()) {
+        auto removal = scaled;
+        int w = scaled.width(), h = scaled.height();
+        std::memset(deleted, false, w * h * sizeof(bool));
+        for (int i = 0, length = size.height() - scaled.height(); i < length; ++ i) {
+            auto seam = find_seam(removal, Horizontal, dp_space, mark_space);
+            removal = delete_seam(removal, seam, Horizontal);
+            convert_mark_seam(w, h, seam, deleted, Horizontal);
+            scaled = add_seam(scaled, seam, Horizontal);
+        }
     }
 
     // Scale by width
-    while (scaled.width() != size.width()) {
-        auto seam = find_seam(scaled, Vertical, dp_space, mark_space);
-        scaled = scaled.width() < size.width() ?
-                 add_seam(scaled, seam, Vertical):
-                 delete_seam(scaled, seam, Vertical);
+    if (scaled.width() > size.width()) {
+        for (int i = 0, length = scaled.width() - size.width(); i < length; ++ i) {
+            auto seam = find_seam(scaled, Vertical, dp_space, mark_space);
+            scaled = delete_seam(scaled, seam, Vertical);
+        }
+    } else if (scaled.width() < size.width()) {
+        auto removal = scaled;
+        int w = scaled.width(), h = scaled.height();
+        std::memset(deleted, false, w * h * sizeof(bool));
+        for (int i = 0, length = size.width() - scaled.width(); i < length; ++ i) {
+            auto seam = find_seam(removal, Vertical, dp_space, mark_space);
+            removal = delete_seam(removal, seam, Vertical);
+            convert_mark_seam(w, h, seam, deleted, Vertical);
+            scaled = add_seam(scaled, seam, Vertical);
+        }
     }
 
     // Free and return
     std::free(dp_space);
     std::free(mark_space);
+    std::free(deleted);
     return scaled;
 }
