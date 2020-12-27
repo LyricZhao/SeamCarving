@@ -13,8 +13,6 @@ set(QT_VERSION 5)
 set(REQUIRED_LIBS Core Gui Widgets)
 set(REQUIRED_LIBS_QUALIFIED Qt5::Core Qt5::Gui Qt5::Widgets)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -openmp")
-
 add_executable(${PROJECT_NAME} main.cpp window.cpp scaling.cpp)
 
 if (NOT CMAKE_PREFIX_PATH)
@@ -23,4 +21,5 @@ if (NOT CMAKE_PREFIX_PATH)
 endif ()
 
 find_package(Qt${QT_VERSION} COMPONENTS ${REQUIRED_LIBS} REQUIRED)
-target_link_libraries(${PROJECT_NAME} ${REQUIRED_LIBS_QUALIFIED})
+find_package(OpenMP REQUIRED)
+target_link_libraries(${PROJECT_NAME} ${REQUIRED_LIBS_QUALIFIED} OpenMP::OpenMP_CXX)

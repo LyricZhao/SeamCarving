@@ -11,9 +11,12 @@ class Window: public QLabel {
     Q_OBJECT
 private:
     QImage image;
+    QPixmap display;
+    const char *output_path;
 
 public:
-    explicit Window(const QImage &image, QWidget* parent=nullptr);
+    explicit Window(const QImage &image, const char *output_path, QWidget* parent=nullptr);
+    ~Window();
 
 public slots:
     void resizeEvent(QResizeEvent *event) override;

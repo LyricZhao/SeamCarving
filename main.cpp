@@ -7,8 +7,8 @@
 
 int main(int argc, char *argv[]) {
     // Check args
-    if (argc != 2) {
-        std::cerr << "Usage: seam_carving <image_path>" << std::endl;
+    if (argc != 3) {
+        std::cerr << "Usage: seam_carving <image_path> <output_path>" << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Show UI
-    Window window(image);
+    Window window(image, argv[2]);
     window.show();
     return QApplication::exec();
 }

@@ -1,4 +1,7 @@
+#pragma ide diagnostic ignored "openmp-use-default-none"
+
 #include <iostream>
+#include <omp.h>
 #include <vector>
 
 #include "scaling.h"
@@ -20,20 +23,23 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
         int b = qBlue(color_a); b -= qBlue(color_b); if (b < 0) b = -b;
         return r + g + b;
     };
-    for (int y = 0, index = 0; y < h; ++ y) {
+#pragma omp parallel for
+    for (int y = 0; y < h; ++ y) {
+        int index = y * w;
         for (int x = 0; x < w; ++ x, ++ index) {
             dp_space[index] = 0;
+            auto pixel = image.pixel(x, y);
             if (x > 0) {
-                dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x - 1, y));
+                dp_space[index] += color_distance(pixel, image.pixel(x - 1, y));
             }
             if (x + 1 < w) {
-                dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x + 1, y));
+                dp_space[index] += color_distance(pixel, image.pixel(x + 1, y));
             }
             if (y > 0) {
-                dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x, y - 1));
+                dp_space[index] += color_distance(pixel, image.pixel(x, y - 1));
             }
             if (y + 1 < h) {
-                dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x, y + 1));
+                dp_space[index] += color_distance(pixel, image.pixel(x, y + 1));
             }
         }
     }
@@ -47,8 +53,9 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
     std::vector<int> seam;
     if (direction == Horizontal) {
         for (int x = 1; x < w; ++ x) {
-            int index = x;
-            for (int y = 0; y < h; ++ y, index += w) {
+#pragma omp parallel for
+            for (int y = 0; y < h; ++ y) {
+                int index = y * w + x;
                 cost_t dp = 0x3fffffff, energy = dp_space[index];
                 if (y > 0) {
                     update(dp, energy + dp_space[index - w - 1], mark_space[index], -1);
@@ -77,8 +84,9 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
         std::reverse(seam.begin(), seam.end());
     } else {
         for (int y = 1; y < h; ++ y) {
-            int index = y * w;
-            for (int x = 0; x < w; ++ x, ++ index) {
+#pragma omp parallel for
+            for (int x = 0; x < w; ++ x) {
+                int index = y * w + x;
                 cost_t dp = 0x3fffffff, energy = dp_space[index];
                 if (x > 0) {
                     update(dp, energy + dp_space[index - w - 1], mark_space[index], -1);
@@ -123,6 +131,7 @@ QImage add_seam(const QImage &image, const std::vector<int> &seam, Direction dir
 
     if (direction == Horizontal) {
         assert(seam.size() == size.width());
+#pragma omp parallel for
         for (int x = 0; x < size.width(); ++ x) {
             for (int y = 0; y < size.height(); ++ y) {
                 scaled.setPixel(x, y, image.pixel(x, y - (y > seam[x])));
@@ -134,6 +143,7 @@ QImage add_seam(const QImage &image, const std::vector<int> &seam, Direction dir
         }
     } else {
         assert(seam.size() == size.height());
+#pragma omp parallel for
         for (int y = 0; y < size.height(); ++ y) {
             for (int x = 0; x < size.width(); ++ x) {
                 scaled.setPixel(x, y, image.pixel(x - (x > seam[y]), y));
@@ -154,6 +164,7 @@ QImage delete_seam(const QImage &image, const std::vector<int> &seam, Direction 
 
     if (direction == Horizontal) {
         assert(seam.size() == size.width());
+#pragma omp parallel for
         for (int x = 0; x < size.width(); ++ x) {
             for (int y = 0; y < size.height(); ++ y) {
                 scaled.setPixel(x, y, image.pixel(x, y + (y >= seam[x])));
@@ -161,6 +172,7 @@ QImage delete_seam(const QImage &image, const std::vector<int> &seam, Direction 
         }
     } else {
         assert(seam.size() == size.height());
+#pragma omp parallel for
         for (int y = 0; y < size.height(); ++ y) {
             for (int x = 0; x < size.width(); ++ x) {
                 scaled.setPixel(x, y, image.pixel(x + (x >= seam[y]), y));
@@ -173,6 +185,7 @@ QImage delete_seam(const QImage &image, const std::vector<int> &seam, Direction 
 void convert_mark_seam(int w, int h, std::vector<int> &seam, bool *deleted, Direction direction) {
     if (direction == Horizontal) {
         assert(seam.size() == w);
+#pragma omp parallel for
         for (int x = 0; x < w; ++ x) {
             int index = x;
             for (int y = 0, removal_y = 0; y < h; ++ y, index += w) {
@@ -190,6 +203,7 @@ void convert_mark_seam(int w, int h, std::vector<int> &seam, bool *deleted, Dire
 
     if (direction == Vertical) {
         assert(seam.size() == h);
+#pragma omp parallel for
         for (int y = 0; y < h; ++ y) {
             int index = y * w;
             for (int x = 0, removal_x = 0; x < w; ++ x, ++ index) {
