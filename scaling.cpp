@@ -23,22 +23,17 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
     for (int y = 0, index = 0; y < h; ++ y) {
         for (int x = 0; x < w; ++ x, ++ index) {
             dp_space[index] = 0;
-            int count = 0;
             if (x > 0) {
                 dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x - 1, y));
-                ++ count;
             }
             if (x + 1 < w) {
                 dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x + 1, y));
-                ++ count;
             }
             if (y > 0) {
                 dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x, y - 1));
-                ++ count;
             }
             if (y + 1 < h) {
                 dp_space[index] += color_distance(image.pixel(x, y), image.pixel(x, y + 1));
-                ++ count;
             }
         }
     }
@@ -175,7 +170,16 @@ QImage delete_seam(const QImage &image, std::vector<int> &seam, Direction direct
     return scaled;
 }
 
-QImage scale(const QImage &image, const QSize &size) {
+void preprocess_seams(const QImage &image, int min_w, int min_h, int max_w, int max_h,
+                      std::vector<std::vector<int>> &h_seams, std::vector<std::vector<int>> &v_seams) {
+    h_seams.clear();
+    v_seams.clear();
+    // TODO: coding
+}
+
+QImage scale(const QImage &image, const QSize &size,
+             const std::vector<std::vector<int>> &h_seams, const std::vector<std::vector<int>> &v_seams) {
+    // TODO: use h/v_seams
     // Make workspace
     QImage scaled = image;
     int max_w = std::max(image.width(), size.width());
