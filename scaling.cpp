@@ -6,7 +6,6 @@
 
 #include "scaling.h"
 
-typedef int64_t cost_t;
 typedef int8_t mark_t;
 
 enum Direction {
@@ -14,37 +13,49 @@ enum Direction {
     Vertical
 };
 
-std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_space, mark_t *mark_space) {
+std::vector<int> find_seam(const QImage &image, Direction direction, int *gray_map, int *m_space, int *dp_space, mark_t *mark_space) {
     int w = image.width(), h = image.height();
     std::memset(mark_space, 0, w * h * sizeof(mark_t));
-    auto color_distance = [](const QRgb &color_a, const QRgb &color_b) -> cost_t {
-        int r = qRed(color_a); r -= qRed(color_b); if (r < 0) r = -r;
-        int g = qGreen(color_a); g -= qGreen(color_b); if (g < 0) g = -g;
-        int b = qBlue(color_a); b -= qBlue(color_b); if (b < 0) b = -b;
-        return r + g + b;
-    };
+
+    // Gray map
 #pragma omp parallel for
     for (int y = 0; y < h; ++ y) {
         int index = y * w;
         for (int x = 0; x < w; ++ x, ++ index) {
-            dp_space[index] = 0;
-            auto pixel = image.pixel(x, y);
-            if (x > 0) {
-                dp_space[index] += color_distance(pixel, image.pixel(x - 1, y));
-            }
-            if (x + 1 < w) {
-                dp_space[index] += color_distance(pixel, image.pixel(x + 1, y));
-            }
-            if (y > 0) {
-                dp_space[index] += color_distance(pixel, image.pixel(x, y - 1));
-            }
-            if (y + 1 < h) {
-                dp_space[index] += color_distance(pixel, image.pixel(x, y + 1));
-            }
+            gray_map[index] = qGray(image.pixel(x, y));
         }
     }
 
-    auto update = [](cost_t &value, cost_t new_value, mark_t &mark, mark_t new_mark) {
+    // Forward energy
+    auto abs = [](auto x) {
+        return x > 0 ? x : -x;
+    };
+    for (int x = 0; x < w; ++ x) {
+        dp_space[x] = m_space[x] = 0;
+    }
+    for (int y = 1; y < h; ++ y) {
+        int y_index = y * w;
+        int last_y_index = (y - 1) * w;
+#pragma omp parallel for
+        for (int x = 0; x < w; ++ x) {
+            int left = (x - 1 + w) % w, right = (x + 1) % w;
+            int m_U = m_space[last_y_index + x];
+            int m_L = m_space[last_y_index + left];
+            int m_R = m_space[last_y_index + right];
+            int c_U = abs(gray_map[y_index + right] - gray_map[y_index + left]);
+            int c_L = abs(gray_map[last_y_index + x] - gray_map[y_index + left]) + c_U;
+            int c_R = abs(gray_map[last_y_index + x] - gray_map[y_index + right]) + c_U;
+            m_U += c_U, m_L += c_L, m_R += c_R;
+            int m = std::min(m_U, std::min(m_L, m_R));
+            if (m == m_U) dp_space[y_index + x] = c_U;
+            if (m == m_L) dp_space[y_index + x] = c_L;
+            if (m == m_R) dp_space[y_index + x] = c_R;
+            m_space[y_index + x] = m;
+        }
+    }
+
+    // DP
+    auto update = [](int &value, int new_value, mark_t &mark, mark_t new_mark) {
         if (new_value < value) {
             value = new_value;
             mark = new_mark;
@@ -56,7 +67,7 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
 #pragma omp parallel for
             for (int y = 0; y < h; ++ y) {
                 int index = y * w + x;
-                cost_t dp = 0x3fffffff, energy = dp_space[index];
+                int dp = 0x3fffffff, energy = dp_space[index];
                 if (y > 0) {
                     update(dp, energy + dp_space[index - w - 1], mark_space[index], -1);
                 }
@@ -68,7 +79,7 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
             }
         }
         int y_pos = 0, index = w - 1;
-        cost_t min_value = 0x3fffffff;
+        int min_value = 0x3fffffff;
         for (int y = 0; y < h; ++ y, index += w) {
             if (dp_space[index] < min_value) {
                 y_pos = y;
@@ -87,7 +98,7 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
 #pragma omp parallel for
             for (int x = 0; x < w; ++ x) {
                 int index = y * w + x;
-                cost_t dp = 0x3fffffff, energy = dp_space[index];
+                int dp = 0x3fffffff, energy = dp_space[index];
                 if (x > 0) {
                     update(dp, energy + dp_space[index - w - 1], mark_space[index], -1);
                 }
@@ -99,7 +110,7 @@ std::vector<int> find_seam(const QImage &image, Direction direction, cost_t *dp_
             }
         }
         int x_pos = 0, index = (h - 1) * w;
-        cost_t min_value = 0x3fffffff;
+        int min_value = 0x3fffffff;
         for (int x = 0; x < w; ++ x, ++ index) {
             if (dp_space[index] < min_value) {
                 x_pos = x;
@@ -225,14 +236,16 @@ QImage scale(const QImage &image, const QSize &size) {
     QImage scaled = image;
     int max_w = std::max(image.width(), size.width());
     int max_h = std::max(image.height(), size.height());
-    auto *dp_space = static_cast<cost_t*>(std::malloc(max_w * max_h * sizeof(cost_t)));
+    auto *gray_map = static_cast<int*>(std::malloc(max_w * max_h * sizeof(int)));
+    auto *m_space = static_cast<int*>(std::malloc(max_w * max_h * sizeof(int)));
+    auto *dp_space = static_cast<int*>(std::malloc(max_w * max_h * sizeof(int)));
     auto *mark_space = static_cast<mark_t*>(std::malloc(max_w * max_h * sizeof(mark_t)));
     auto *deleted = static_cast<bool*>(std::malloc(max_w * max_h * sizeof(bool)));
 
     // Scale by height
     if (scaled.height() > size.height()) {
         for (int i = 0, length = scaled.height() - size.height(); i < length; ++ i) {
-            auto seam = find_seam(scaled, Horizontal, dp_space, mark_space);
+            auto seam = find_seam(scaled, Horizontal, gray_map, m_space, dp_space, mark_space);
             scaled = delete_seam(scaled, seam, Horizontal);
         }
     } else if (scaled.height() < size.height()) {
@@ -240,7 +253,7 @@ QImage scale(const QImage &image, const QSize &size) {
         int w = scaled.width(), h = scaled.height();
         std::memset(deleted, false, w * h * sizeof(bool));
         for (int i = 0, length = size.height() - scaled.height(); i < length; ++ i) {
-            auto seam = find_seam(removal, Horizontal, dp_space, mark_space);
+            auto seam = find_seam(removal, Horizontal, gray_map, m_space, dp_space, mark_space);
             removal = delete_seam(removal, seam, Horizontal);
             convert_mark_seam(w, h, seam, deleted, Horizontal);
             scaled = add_seam(scaled, seam, Horizontal);
@@ -250,7 +263,7 @@ QImage scale(const QImage &image, const QSize &size) {
     // Scale by width
     if (scaled.width() > size.width()) {
         for (int i = 0, length = scaled.width() - size.width(); i < length; ++ i) {
-            auto seam = find_seam(scaled, Vertical, dp_space, mark_space);
+            auto seam = find_seam(scaled, Vertical, gray_map, m_space, dp_space, mark_space);
             scaled = delete_seam(scaled, seam, Vertical);
         }
     } else if (scaled.width() < size.width()) {
@@ -258,7 +271,7 @@ QImage scale(const QImage &image, const QSize &size) {
         int w = scaled.width(), h = scaled.height();
         std::memset(deleted, false, w * h * sizeof(bool));
         for (int i = 0, length = size.width() - scaled.width(); i < length; ++ i) {
-            auto seam = find_seam(removal, Vertical, dp_space, mark_space);
+            auto seam = find_seam(removal, Vertical, gray_map, m_space, dp_space, mark_space);
             removal = delete_seam(removal, seam, Vertical);
             convert_mark_seam(w, h, seam, deleted, Vertical);
             scaled = add_seam(scaled, seam, Vertical);
@@ -266,6 +279,8 @@ QImage scale(const QImage &image, const QSize &size) {
     }
 
     // Free and return
+    std::free(gray_map);
+    std::free(m_space);
     std::free(dp_space);
     std::free(mark_space);
     std::free(deleted);
