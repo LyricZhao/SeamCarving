@@ -1,8 +1,12 @@
 # JetBrains
 .idea
+
+# Compile
 cmake-build-*
+build
 
 # Large files
 paper.pdf
 requirements.pdf
 slides.pdf
+videos
